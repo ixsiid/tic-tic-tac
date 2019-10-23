@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Tic Tic Tac</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+
+        html,
+        body {
+            width: 100%;
+        }
+
+        #content {
+            display: flex;
+            flex-direction: column;
+            flex-wrap: nowrap;
+            justify-content: space-between;
+            align-items: center;
+
+            padding: 5vw;
+            margin: auto;
+        }
+
+        .player2 {
+            transform-origin: 50% 50%;
+            transform: rotate(180deg);
+        }
+
+        #content table {
+            border-collapse: collapse;
+            margin: 2.5vw;
+        }
+
+        #content td {
+            width: 30vw;
+            height: calc((100vh - 5vw * 2 - (2vw + 8vw + 2vw) * 2 - 2.5vw * 8) / 7);
+            border: 1px solid black;
+        }
+
+        #content button {
+            width: 40vw;
+            height: 8vw;
+            padding: 2vw;
+            background: lightgray;
+            border: 1px solid black;
+            border-radius: 4vw;
+            margin: 2vw;
+        }
+
+        #content td .piece {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+
+            padding: 0;
+            margin: auto;
+            width: 65%;
+            height: 65%;
+
+            border: rgba(0, 0, 0, 0) 2px solid;
+            border-radius: 50%;
+        }
+
+        #content td.small1>*>*>.piece {
+            border-color: red;
+        }
+
+        #content td.middle1>*>.piece {
+            border-color: red;
+        }
+
+        #content td.large1>.piece {
+            border-color: red;
+        }
+
+        #content td.small2>*>*>.piece {
+            border-color: blue;
+        }
+
+        #content td.middle2>*>.piece {
+            border-color: blue;
+        }
+
+        #content td.large2>.piece {
+            border-color: blue;
+        }
+
+        #content .pick1 {
+            background-color: rgba(255, 0, 0, 0.08);
+        }
+
+        #content .put1 {
+            background-color: rgba(255, 0, 0, 0.2);
+        }
+
+        #content .pick2 {
+            background-color: rgba(0, 0, 255, 0.08);
+        }
+
+        #content .put2 {
+            background-color: rgba(0, 0, 255, 0.2);
+        }
+
+        #content #move {
+            pointer-events: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #controller {
+            display: flex;
+            flex-direction: column;
+            flex-wrap: nowrap;
+            justify-content:space-evenly;
+            align-items: center;
+
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-color: rgba(0, 0, 0, 0.3);
+
+            visibility: hidden;
+        }
+
+        #controller .result {
+            font-size: 11vw;
+            margin: 2vw;
+            padding: 1vw 8vw;
+            text-shadow:
+                1vw 1vw 1vw white,
+                1vw -1vw 1vw white,
+                -1vw 1vw 1vw white,
+                -1vw -1vw 1vw white;
+        }
+
+        #controller button {
+            font-size: 7vw;
+            background-color: white;
+            border: 1px solid black;
+            border-radius: 4vw;
+        }
+        
+        #controller button span {
+            display: inline-block;
+            padding: 2vw;
+        }
+
+    </style>
+    <script>
+        const rule = {
+            pick: [],
+            put: [],
+            accept: [],
+        };
+
+        const pieces = { small: 0, middle: 1, large: 2 };
+        const priority_piece = td => {
+            return [].map.call(td.classList, x => x)
+                .sort((a, b) => pieces[b.slice(0, -1)] - pieces[a.slice(0, -1)])[0];
+        };
+
+        rule.pick.push((td, p) => {
+            let table = td.parentElement;
+            while (table.tagName != 'TABLE') table = table.parentElement;
+
+            if (table.classList.contains('stock')) {
+                if (table.classList.contains(`player${p}`)) {
+                    return td.classList.length > 0;
+                }
+            }
+
+            if (table.classList.contains('board')) {
+                if (td.classList.length == 0) return false;
+
+                return priority_piece(td).slice(-1) == p;
+            }
+        });
+
+        rule.put.push((td, _) => {
+            let table = td.parentElement;
+            while (table.tagName != 'TABLE') table = table.parentElement;
+
+            if (!table.classList.contains('board')) return false;
+
+            if (td.classList.length == 0) return true;
+
+            const p = pieces[status.pick.slice(0, -1)];
+
+            const q = pieces[priority_piece(td).slice(0, -1)];
+            return p > q;
+        });
+
+        const MaxPlayer = 2;
+        const Commands = ['pick', 'put', 'accept'];
+        const status = {
+            player: 0,
+            command: 'accept',
+            pick: '',
+            move: [],
+        };
+
+        const phase = (prev, current) => {
+            [].map.call(document.querySelectorAll('td'), x => {
+                x.classList.remove('clickable');
+                x.classList.remove(`${prev.command}${prev.player}`);
+
+                for (let r of rule[current.command]) {
+                    if (r(x, current.player)) {
+                        x.classList.add('clickable');
+                        x.classList.add(`${current.command}${current.player}`);
+                        break;
+                    }
+                }
+            });
+        };
+
+        const draw_move = () => {
+            const context = document.querySelector('#move')
+                .getContext('2d');
+            const center = element => {
+                rect = element.getBoundingClientRect();
+                return [
+                    (rect.left + rect.right) / 2,
+                    (rect.top + rect.bottom) / 2,
+                ];
+            };
+
+            const style = {
+                1: '#F00',
+                2: '#00F',
+            };
+            context.lineCap = 'round';
+            context.lineWidth = 5;
+
+            const points = status.move.map(x => center(x));
+            const distance = Math.sqrt(Math.pow(points[0][0] - points[1][0], 2) + Math.pow(points[0][1] - points[1][1], 2));
+            const gradient = context.createLinearGradient(...points[0], ...points[1]);
+            gradient.addColorStop(0.3, style[status.player]);
+            gradient.addColorStop(1, '#FFF');
+            context.strokeStyle = gradient;
+
+            context.beginPath();
+            context.moveTo(...points[0]);
+            context.lineTo(...points[1]);
+            context.stroke();
+        };
+
+        const clear_move = () => {
+            const canvas = document.querySelector('#move');
+            const context = canvas.getContext('2d');
+            context.clearRect(0, 0, canvas.width, canvas.height);
+        };
+
+        const next = () => {
+            const prev = { ...status };
+            switch (status.command) {
+                case 'pick':
+                    status.command = 'put';
+                    break;
+                case 'put':
+                    status.command = 'accept';
+                    draw_move();
+                    break;
+                case 'accept':
+                    clear_move();
+
+                    const win = is_win();
+
+                    if (win > 0) {
+                        document.querySelector('#controller').style.visibility = 'visible';
+                        [].map.call(document.querySelectorAll('.result'), x => x.textContent = 'Loose');
+                        document.querySelector(`.player${win}.result`).textContent = 'Win';
+                    } else {
+                        status.player = status.player % MaxPlayer + 1;
+                        status.command = 'pick';
+                        status.move = [];
+                    }
+                    break;
+                default:
+                    status.player = 1;
+                    status.command = 'pick';
+                    status.pick = '';
+                    status.move = [];
+
+                    clear_move();
+                    break;
+            }
+            return prev;
+        };
+
+        const revert = p => {
+            clear_move();
+            if (status.player != p) return;
+
+            const prev = { ...status };
+            status.command = 'pick';
+            status.move = [];
+            phase(prev, status);
+        };
+
+        const td_click = td => {
+            if (!td.classList.contains('clickable')) return;
+
+            if (status.command == 'pick') {
+                status.pick = priority_piece(td);
+                status.move.push(td);
+            } else if (status.command == 'put') {
+                status.move.push(td);
+            }
+
+            phase(next(), status);
+        };
+
+        const accept = p => {
+            if (status.player != p) return;
+            if (status.command != 'accept') return;
+
+            status.move[0].classList.remove(status.pick);
+            status.move[1].classList.add(status.pick);
+            phase(next(), status);
+        };
+
+        const new_game = () => {
+            const class_clear = element => {
+                [].map.call(element.classList, x => x).map(x => element.classList.remove(x));
+            };
+
+            const ps = Object.keys(pieces);
+            for (let p = 1; p <= MaxPlayer; p++) {
+                [].map.call(document.querySelectorAll(`.stock.player${p} td`), (x, i) => {
+                    class_clear(x);
+                    x.classList.add(`${ps[i % ps.length]}${p}`);
+                });
+            }
+
+            [].map.call(document.querySelectorAll(`.board td`), (x, i) => {
+                class_clear(x);
+            });
+
+            document.querySelector('#controller').style.visibility = 'hidden';
+
+            phase(next(), status);
+        };
+
+        const is_win = () => {
+            const board = [].map.call(document.querySelectorAll('.board td'), x => {
+                const p = priority_piece(x);
+                if (!p) return 0;
+                return parseInt(p.slice(-1));
+            });
+
+            const l = Math.sqrt(board.length);
+            const board2x = board.reduce((a, b) => {
+                let t = a[a.length - 1];
+                if (t.length >= l) {
+                    t = [];
+                    a.push(t);
+                }
+                t.push(b);
+                return a;
+            }, [[]]);
+
+            // 横
+            for (let i = 0; i < l; i++) {
+                const w = board2x[i].reduce((a, b) => a == b ? a : 0);
+                if (w > 0) return w;
+            }
+
+            // 縦
+            for (let i = 0; i < l; i++) {
+                const w = board2x.reduce((a, b) => a[i] == b[i] ? b : 0)[i];
+                if (w > 0) return w;
+            }
+
+            // 斜め
+            const s1 = board2x.reduce((a, b, i) => a[i - 1] == b[i] ? b : 0)[l - 1];
+            if (s1 > 0) return s1;
+            const s2 = board2x.reduce((a, b, i) => a[l - i] == b[l - i - 1] ? b : 0)[0];
+            if (s2 > 0) return s2;
+
+            return 0;
+        }
+
+        const outline = false;
+
+        window.addEventListener('load', () => {
+            const cell_size = document.querySelector('td').getBoundingClientRect();
+            const size = Math.min(cell_size.width, cell_size.height) + 'px';
+            [].map.call(document.querySelectorAll('td'), x => {
+                x.style.width = size;
+                x.style.height = size;
+
+                let p = x;
+                for (let i = 0; i < 3; i++) {
+                    const div = document.createElement('div');
+                    div.classList.add(`piece`);
+                    p.appendChild(div);
+                    p = div;
+                }
+
+                x.addEventListener('click', () => td_click(x), false);
+            });
+
+            const button_command = { revert, accept };
+
+            [].map.call(document.querySelectorAll('#content button'), x => {
+                const p = parseInt(x.parentElement.classList[0].slice(-1));
+                x.addEventListener('click', () => button_command[x.classList[0]](p), false);
+            });
+
+            {
+                const rect = document.querySelector('#move').getBoundingClientRect();
+                move.setAttribute('width', rect.width);
+                move.setAttribute('height', rect.height);
+            }
+
+            document.querySelector('#restart').addEventListener('click', new_game, false);
+
+            (outline ? phase(next(), status) : new_game());
+        }, false);
+    </script>
+</head>
+
+<body>
+    <div id="content">
+        <!--
+            初期値はスクリプトでリセットする
+            直書きの初期値はデザイン確認用
+        -->
+        <p class="player2 command">
+            <button class="revert">Revert</button>
+            <button class="accept">Accept</button>
+        </p>
+        <table class="player2 stock">
+            <tr>
+                <td></td>
+                <td></td>
+                <td class="large2"></td>
+            </tr>
+            <tr>
+                <td class="small2"></td>
+                <td></td>
+                <td></td>
+            </tr>
+        </table>
+        <table class="board">
+            <tr>
+                <td class="small2 middle2 large1"></td>
+                <td class="small1"></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td class="large1"></td>
+                <td class="small1 middle2"></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td></td>
+                <td class="large2"></td>
+            </tr>
+        </table>
+        <table class="player1 stock">
+            <tr>
+                <td></td>
+                <td class="middle1"></td>
+                <td></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td class="middle1"></td>
+                <td></td>
+            </tr>
+        </table>
+        <p class="player1 command">
+            <button class="revert">Revert</button>
+            <button class="accept">Accept</button>
+        </p>
+        <canvas id="move"></canvas>
+    </div>
+    <div id="controller">
+        <div class="player2 result">Win</div>
+        <div><button id="restart"><span class="player2">再</span><span>戦</span></button></div>
+        <div class="player1 result">Loose</div>
+    </div>
+</body>
+
+</html>
