@@ -187,15 +187,15 @@
             const pieces = [].map.call(td.querySelectorAll('.piece'), p =>
                 [].filter.call(p.classList, n => n.startsWith('player'))[0]
             ).map(x => x ? parseInt(x.slice(6)) : -1);
-            const target = pieces.filter(x => x > 0);
-            return [target.shift(), pieces.indexOf(target)];
+            const target = pieces.filter(x => x > 0).shift();
+            return [target, pieces.indexOf(target)];
         };
 
         const move_piece = (td_from, td_to, player) => {
             const [from_target, from_index] = priority_piece(td_from);
-            console.assert(from_target <= 0, '動かせる駒がありません。');
-            console.assert(from_target != player, '動かせる駒が手番ではありません。');
-            const [to_target, to_index] = priority_piece(td_to);
+            console.assert(from_target > 0, '動かせる駒がありません。');
+            console.assert(from_target == player, '動かせる駒が手番ではありません。');
+            let [to_target, to_index] = priority_piece(td_to);
             if (!to_target) to_index = Infinity;
             console.assert(from_index < to_index, '動く先のほうが駒が大きいです。');
 
@@ -226,7 +226,7 @@
 
             const [target, index] = priority_piece(td);
 
-            if (target <= 0) return true;
+            if (target <= 0 || !target) return true;
             return status.pick > target;
         });
 
