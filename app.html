@@ -79,15 +79,11 @@
             --p2: blue;
         }
 
-        #content td.small1>*>*>.piece,
-        #content td.middle1>*>.piece,
-        #content td.large1>.piece {
+        #content .piece.player1 {
             border-color: var(--p1);
         }
 
-        #content td.small2>*>*>.piece,
-        #content td.middle2>*>.piece,
-        #content td.large2>.piece {
+        #content .piece.player2 {
             border-color: var(--p2);
         }
 
@@ -188,8 +184,23 @@
 
         const pieces = { small: 0, middle: 1, large: 2 };
         const priority_piece = td => {
-            return [].map.call(td.classList, x => x)
-                .sort((a, b) => pieces[b.slice(0, -1)] - pieces[a.slice(0, -1)])[0];
+            const pieces = [].map.call(td.querySelectorAll('.piece'), p =>
+                [].filter.call(p.classList, n => n.startsWith('player'))[0]
+            ).map(x => x ? parseInt(x.slice(6)) : -1);
+            const target = pieces.filter(x => x > 0);
+            return [target.shift(), pieces.indexOf(target)];
+        };
+
+        const move_piece = (td_from, td_to, player) => {
+            const [from_target, from_index] = priority_piece(td_from);
+            console.assert(from_target <= 0, '動かせる駒がありません。');
+            console.assert(from_target != player, '動かせる駒が手番ではありません。');
+            const [to_target, to_index] = priority_piece(td_to);
+            if (!to_target) to_index = Infinity;
+            console.assert(from_index < to_index, '動く先のほうが駒が大きいです。');
+
+            td_from.querySelectorAll('.piece')[from_index].classList.remove(`player${player}`);
+            td_to.querySelectorAll('.piece')[from_index].classList.add(`player${player}`);
         };
 
         rule.pick.push((td, p) => {
@@ -198,14 +209,12 @@
 
             if (table.classList.contains('stock')) {
                 if (table.classList.contains(`player${p}`)) {
-                    return td.classList.length > 0;
+                    return priority_piece(td)[0] > 0;
                 }
             }
 
             if (table.classList.contains('board')) {
-                if (td.classList.length == 0) return false;
-
-                return priority_piece(td).slice(-1) == p;
+                return priority_piece(td)[0] == p;
             }
         });
 
@@ -215,12 +224,10 @@
 
             if (!table.classList.contains('board')) return false;
 
-            if (td.classList.length == 0) return true;
+            const [target, index] = priority_piece(td);
 
-            const p = pieces[status.pick.slice(0, -1)];
-
-            const q = pieces[priority_piece(td).slice(0, -1)];
-            return p > q;
+            if (target <= 0) return true;
+            return status.pick > target;
         });
 
         const MaxPlayer = 2;
@@ -335,7 +342,7 @@
             if (!td.classList.contains('clickable')) return;
 
             if (status.command == 'pick') {
-                status.pick = priority_piece(td);
+                status.pick = priority_piece(td)[0];
                 status.move.push(td);
             } else if (status.command == 'put') {
                 status.move.push(td);
@@ -348,8 +355,7 @@
             if (status.player != p) return;
             if (status.command != 'accept') return;
 
-            status.move[0].classList.remove(status.pick);
-            status.move[1].classList.add(status.pick);
+            move_piece(...status.move, status.player);
             phase(next(), status);
         };
 
@@ -358,17 +364,20 @@
                 [].map.call(element.classList, x => x).map(x => element.classList.remove(x));
             };
 
-            const ps = Object.keys(pieces);
+            [].map.call(document.querySelectorAll('.piece'), p => {
+                class_clear(p);
+                p.classList.add('piece');
+            });
+
             for (let p = 1; p <= MaxPlayer; p++) {
-                [].map.call(document.querySelectorAll(`.stock.player${p} td`), (x, i) => {
-                    class_clear(x);
-                    x.classList.add(`${ps[i % ps.length]}${p}`);
+                [].map.call(document.querySelectorAll(`.stock.player${p}`), (x, i) => {
+                    [].map.call(x.querySelectorAll('tr'), tr => {
+                        [].map.call(tr.querySelectorAll('td'), (td, i) => {
+                            td.querySelectorAll('.piece')[i].classList.add(`player${p}`);
+                        });
+                    });
                 });
             }
-
-            [].map.call(document.querySelectorAll(`.board td`), (x, i) => {
-                class_clear(x);
-            });
 
             document.querySelector('#controller').style.visibility = 'hidden';
 
@@ -376,10 +385,11 @@
         };
 
         const is_win = () => {
+            return 0;
             const board = [].map.call(document.querySelectorAll('.board td'), x => {
-                const p = priority_piece(x);
+                const p = priority_piece(x)[0];
                 if (!p) return 0;
-                return parseInt(p.slice(-1));
+                return p;
             });
 
             const l = Math.sqrt(board.length);
@@ -462,7 +472,7 @@
                         p.appendChild(piece);
                         p = piece;
                     }
-                    
+
                     tr.appendChild(td);
                 }
                 board.appendChild(tr);
