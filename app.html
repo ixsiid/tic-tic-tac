@@ -26,7 +26,7 @@
             align-items: center;
 
             padding: 5vw;
-            margin: auto;
+            height: calc(100vh - 10vw);
         }
 
         .player2 {
@@ -34,14 +34,19 @@
             transform: rotate(180deg);
         }
 
+        #content div.flex {
+            padding: 2vw;
+            width: 100%;
+        }
+
         #content table {
+            height: 100%;
+            width: 100%;
             border-collapse: collapse;
-            margin: 2.5vw;
+            margin: 0 auto;
         }
 
         #content td {
-            width: 30vw;
-            height: calc((100vh - 5vw * 2 - (2vw + 8vw + 2vw) * 2 - 2.5vw * 8) / 7);
             border: 1px solid black;
         }
 
@@ -69,28 +74,21 @@
             border-radius: 50%;
         }
 
-        #content td.small1>*>*>.piece {
-            border-color: red;
+        #content td {
+            --p1: red;
+            --p2: blue;
         }
 
-        #content td.middle1>*>.piece {
-            border-color: red;
-        }
-
+        #content td.small1>*>*>.piece,
+        #content td.middle1>*>.piece,
         #content td.large1>.piece {
-            border-color: red;
+            border-color: var(--p1);
         }
 
-        #content td.small2>*>*>.piece {
-            border-color: blue;
-        }
-
-        #content td.middle2>*>.piece {
-            border-color: blue;
-        }
-
+        #content td.small2>*>*>.piece,
+        #content td.middle2>*>.piece,
         #content td.large2>.piece {
-            border-color: blue;
+            border-color: var(--p2);
         }
 
         #content .pick1 {
@@ -122,7 +120,7 @@
             display: flex;
             flex-direction: column;
             flex-wrap: nowrap;
-            justify-content:space-evenly;
+            justify-content: space-evenly;
             align-items: center;
 
             width: 100vw;
@@ -152,10 +150,32 @@
             border: 1px solid black;
             border-radius: 4vw;
         }
-        
+
         #controller button span {
             display: inline-block;
             padding: 2vw;
+        }
+
+
+
+        #config {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #config #qr {
+            width: 1.5em;
+            height: 2em;
+            padding: 0.2em;
+            position: absolute;
+            left: 0;
+            background-color: black;
+            top: calc(50vh - 1.1em);
+            border-radius: 0 25% 25% 0;
         }
 
     </style>
@@ -396,23 +416,81 @@
 
         const outline = false;
 
-        window.addEventListener('load', () => {
-            const cell_size = document.querySelector('td').getBoundingClientRect();
-            const size = Math.min(cell_size.width, cell_size.height) + 'px';
-            [].map.call(document.querySelectorAll('td'), x => {
-                x.style.width = size;
-                x.style.height = size;
+        const layout = size => {
+            document.querySelector('table.board').parentElement.style.flexGrow = size;
+            [].map.call(document.querySelectorAll('#content table'), x => {
+                x.style.width = '100%';
+                x.style.height = '100%';
 
-                let p = x;
-                for (let i = 0; i < 3; i++) {
-                    const div = document.createElement('div');
-                    div.classList.add(`piece`);
-                    p.appendChild(div);
-                    p = div;
-                }
-
-                x.addEventListener('click', () => td_click(x), false);
+                [].map.call(x.querySelectorAll('tr'), x => {
+                    x.parentElement.removeChild(x);
+                });
             });
+
+
+            [].map.call(document.querySelectorAll('#content table.stock tbody'), x => {
+                for (let i = 0; i < 2; i++) {
+                    const tr = document.createElement('tr');
+                    for (let j = 0; j < size; j++) {
+                        const td = document.createElement('td');
+                        td.addEventListener('click', () => td_click(td), false);
+
+                        let p = td;
+                        for (let k = 0; k < size; k++) {
+                            const piece = document.createElement('div');
+                            piece.classList.add(`piece`);
+                            p.appendChild(piece);
+                            p = piece;
+                        }
+                        tr.appendChild(td);
+                    }
+                    x.appendChild(tr);
+                }
+            });
+
+            const board = document.querySelector('#content table.board tbody');
+            for (let i = 0; i < size; i++) {
+                const tr = document.createElement('tr');
+                for (let j = 0; j < size; j++) {
+                    const td = document.createElement('td');
+                    td.addEventListener('click', () => td_click(td), false);
+
+                    let p = td;
+                    for (let k = 0; k < size; k++) {
+                        const piece = document.createElement('div');
+                        piece.classList.add(`piece`);
+                        p.appendChild(piece);
+                        p = piece;
+                    }
+                    
+                    tr.appendChild(td);
+                }
+                board.appendChild(tr);
+            }
+
+            // サイズの計算と設定を同時に行うと、
+            // 後続する要素サイズが変わるため、
+            // 最初にすべての要素サイズを計算する。
+            // 計算が終わったら設定する
+            const stock_sizes = [].map.call(document.querySelectorAll('#content table.stock'), x => {
+                const table_size = x.getBoundingClientRect();
+                return Math.min(table_size.width, table_size.height);
+            });
+            const board_size = document.querySelector('#content table.board').getBoundingClientRect();
+            const bsize = Math.min(board_size.width, board_size.height);
+
+            [].map.call(document.querySelectorAll('#content table.stock'), (x, i) => {
+                x.style.width = stock_sizes[i] / 2 * size + 'px';
+                x.style.height = stock_sizes[i] + 'px';
+            });
+            document.querySelector('#content table.board').style.width = bsize + 'px';
+            document.querySelector('#content table.board').style.height = bsize + 'px';
+        }
+
+        const size = 3;
+
+        window.addEventListener('load', () => {
+            layout(size);
 
             const button_command = { revert, accept };
 
@@ -440,56 +518,65 @@
             初期値はスクリプトでリセットする
             直書きの初期値はデザイン確認用
         -->
-        <p class="player2 command">
+        <p class="player2 command" style="flex-grow: 0">
             <button class="revert">Revert</button>
             <button class="accept">Accept</button>
         </p>
-        <table class="player2 stock">
-            <tr>
-                <td></td>
-                <td></td>
-                <td class="large2"></td>
-            </tr>
-            <tr>
-                <td class="small2"></td>
-                <td></td>
-                <td></td>
-            </tr>
-        </table>
-        <table class="board">
-            <tr>
-                <td class="small2 middle2 large1"></td>
-                <td class="small1"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td class="large1"></td>
-                <td class="small1 middle2"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td></td>
-                <td></td>
-                <td class="large2"></td>
-            </tr>
-        </table>
-        <table class="player1 stock">
-            <tr>
-                <td></td>
-                <td class="middle1"></td>
-                <td></td>
-            </tr>
-            <tr>
-                <td></td>
-                <td class="middle1"></td>
-                <td></td>
-            </tr>
-        </table>
-        <p class="player1 command">
+        <div class="flex" style="flex-grow: 2">
+            <table class="player2 stock">
+                <tr>
+                    <td></td>
+                    <td></td>
+                    <td class="large2"></td>
+                </tr>
+                <tr>
+                    <td class="small2"></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            </table>
+        </div>
+        <div class="flex">
+            <table class="board">
+                <tr>
+                    <td class="small2 middle2 large1"></td>
+                    <td class="small1"></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td class="large1"></td>
+                    <td class="small1 middle2"></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td></td>
+                    <td class="large2"></td>
+                </tr>
+            </table>
+        </div>
+        <div class="flex" style="flex-grow: 2">
+            <table class="player1 stock">
+                <tr>
+                    <td></td>
+                    <td class="middle1"></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td class="middle1"></td>
+                    <td></td>
+                </tr>
+            </table>
+        </div>
+        <p class="player1 command" style="flex-grow: 0">
             <button class="revert">Revert</button>
             <button class="accept">Accept</button>
         </p>
         <canvas id="move"></canvas>
+    </div>
+    <div id="config">
+        <p id="qr">QR</p>
     </div>
     <div id="controller">
         <div class="player2 result">Win</div>
